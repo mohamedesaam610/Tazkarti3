@@ -1,5 +1,4 @@
 import requests
-import re
 import json
 import time
 from recap_token import RecaptchaSolver
@@ -10,7 +9,6 @@ class TicketBooking:
         self.s = requests.Session()
         self.recaptcha_token = recaptcha_token
         self.load_user_data(user_data_file)
-        self.possible_seat_locations = self.determine_seat_locations()
         self.teams = self.initialize_teams()
         self.notified_matches = set()
 
@@ -20,36 +18,14 @@ class TicketBooking:
             self.username = lines[0]
             self.password = lines[1]
             self.search_word = lines[2]
-            self.seats = lines[3]
-            self.category = lines[4]
-
-    def determine_seat_locations(self):
-        if "درج" in self.category and "ول" in self.category:
-            return ["Cat 1", "Cat1"]
-        elif "درج" in self.category and "اني" in self.category:
-            return ["Cat 2", "Cat2"]
-        elif "تالت" in self.category or "ثالث" in self.category:
-            return ["Cat 3", "Cat3"]
-        elif "مقصو" in self.category:
-            return ["VIP"]
-        elif "علو" in self.category:
-            return ["Upper"]
-        elif "سفل" in self.category:
-            return ["Lower"]
-        else:
-            return []
 
     def initialize_teams(self):
         return {
-            'سماع': {'team_name': 'الاسماعيلى', 'eng_team': 'ISMAILY SC', 'categoryName': 'ISMAILY', 'teamid': '182'},
-            'زمالك': {'team_name': 'الزمالك', 'eng_team': 'Zamalek SC', 'categoryName': 'Zamalek', 'teamid': '79'},
-            'هل': {'team_name': 'الأهلى', 'eng_team': 'Al Ahly FC', 'categoryName': 'Ahly', 'teamid': '77'},
-            'مصر': {'team_name': 'النادي المصري للألعاب الرياضية', 'eng_team': 'Al-Masry SC', 'categoryName': 'Al-Masry'}
+            'هل': {'team_name': 'الأهلى', 'eng_team': 'Al Ahly FC', 'categoryName': 'Ahly', 'teamid': '77'}
         }
 
     def find_team_info(self):
-        # لو حابب نثبت الفريق على الأهلي فقط:
-        team_info = self.teams['هل']  # 'هل' ترمز إلى الأهلي
+        team_info = self.teams['هل']  # نركز على الأهلي فقط
         self.team_name = team_info['team_name']
         self.eng_team = team_info['eng_team']
         self.category_name = team_info['categoryName']
@@ -77,7 +53,7 @@ class TicketBooking:
         }
         r = self.s.post('https://tazkarti.com/home/Login', headers=headers, json=json_data).text
         if 'access_token' not in r:
-            print("فشل تسجيل الدخول!")
+            print("❌ فشل تسجيل الدخول!")
             return False
         return True
 
@@ -97,18 +73,14 @@ class TicketBooking:
 
                     available_tickets = []
                     for category in r1_data['data']:
-                        if category['categoryName'].strip().lower() == self.category_name.strip().lower():
+                        if int(self.team_id) == category['teamId'] and category['availableSeats'] > 0:
                             available_tickets.append(category)
-                        else:
-                            for loc in self.possible_seat_locations:
-                                if loc.lower() in category['categoryName'].strip().lower() and int(self.team_id) == category['teamId']:
-                                    available_tickets.append(category)
 
                     if available_tickets:
-                        message = f"🎟️ المباراة بين: {match['teamName1']} و {match['teamName2']}\n"
-                        message += "التذاكر المتاحة الآن:\n"
+                        message = f"🎟️ تذاكر مباراة الأهلي متاحة الآن!\n"
+                        message += f"🆚 {match['teamName1']} vs {match['teamName2']}\n\n"
                         for ticket in available_tickets:
-                            message += f"فئة: {ticket['categoryName']} - {ticket['availableSeats']} مقعد بسعر {ticket['price']} جنيه.\n"
+                            message += f"• فئة: {ticket['categoryName']} - عدد المقاعد: {ticket['availableSeats']} - السعر: {ticket['price']} جنيه\n"
                         print(message)
                         self.send_telegram_notification(message)
                         self.notified_matches.add(match_key)
@@ -116,8 +88,8 @@ class TicketBooking:
             print(f"⚠️ خطأ أثناء الفحص: {e}")
 
     def send_telegram_notification(self, message):
-        telegram_token = '7914202337:AAH7_T9TNFoMa3X8SfyvzmGFjah3lMhhPAA'  # ضع توكن البوت هنا
-        chat_id = '-1002572258171'  # ID الجروب
+        telegram_token = '7914202337:AAH7_T9TNFoMa3X8SfyvzmGFjah3lMhhPAA'  # استبدل بتوكن البوت
+        chat_id = '-1002572258171'              # استبدل بـ chat_id للجروب
         url = f'https://api.telegram.org/bot{telegram_token}/sendMessage'
         payload = {'chat_id': chat_id, 'text': message}
         try:
@@ -141,11 +113,11 @@ if __name__ == '__main__':
         while True:
             booking.check_matches_and_notify()
 
-            # رسالة اطمئنان كل دقيقة
-            if time.time() - last_keep_alive >= 60:
+            # رسالة اطمئنان كل 3 ساعات
+            if time.time() - last_keep_alive >= 3 * 3600:
                 now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 try:
-                    booking.send_telegram_notification(f"✅ السكربت يعمل ويبحث عن تذاكر الأهلي كل 10 ثواني.\n🕒 الوقت الحالي: {now}")
+                    booking.send_telegram_notification(f"✅ السكربت يعمل بدون مشاكل.\n🕒 الوقت الحالي: {now}")
                     print("✅ تم إرسال رسالة تأكيد بأن السكربت شغال.")
                 except Exception as e:
                     print(f"❌ فشل إرسال رسالة الاطمئنان: {e}")
