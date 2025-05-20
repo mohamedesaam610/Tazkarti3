@@ -3,6 +3,7 @@ import re
 import json
 import time
 from recap_token import RecaptchaSolver
+from datetime import datetime
 
 class TicketBooking:
     def __init__(self, user_data_file, recaptcha_token):
@@ -47,14 +48,12 @@ class TicketBooking:
         }
 
     def find_team_info(self):
-        for key in self.teams:
-            if key in self.search_word:
-                team_info = self.teams[key]
-                self.team_name = team_info['team_name']
-                self.eng_team = team_info['eng_team']
-                self.category_name = team_info['categoryName']
-                self.team_id = team_info['teamid']
-                return
+        # لو حابب نثبت الفريق على الأهلي فقط:
+        team_info = self.teams['هل']  # 'هل' ترمز إلى الأهلي
+        self.team_name = team_info['team_name']
+        self.eng_team = team_info['eng_team']
+        self.category_name = team_info['categoryName']
+        self.team_id = team_info['teamid']
 
     def get_headers(self):
         return {
@@ -117,8 +116,8 @@ class TicketBooking:
             print(f"⚠️ خطأ أثناء الفحص: {e}")
 
     def send_telegram_notification(self, message):
-        telegram_token = '7914202337:AAH7_T9TNFoMa3X8SfyvzmGFjah3lMhhPAA'
-        chat_id = '6589167323'
+        telegram_token = '7914202337:AAH7_T9TNFoMa3X8SfyvzmGFjah3lMhhPAA'  # ضع توكن البوت هنا
+        chat_id = '-1002572258171'  # ID الجروب
         url = f'https://api.telegram.org/bot{telegram_token}/sendMessage'
         payload = {'chat_id': chat_id, 'text': message}
         try:
@@ -142,16 +141,14 @@ if __name__ == '__main__':
         while True:
             booking.check_matches_and_notify()
 
-            # رسالة كل ساعة تطمنك إن السكربت شغال
-            if time.time() - last_keep_alive >= 3600:
+            # رسالة اطمئنان كل دقيقة
+            if time.time() - last_keep_alive >= 60:
+                now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 try:
-                    booking.send_telegram_notification("✅ مازال السكربت يعمل ويقوم بالفحص كل 30 ثانية بدون مشاكل.")
+                    booking.send_telegram_notification(f"✅ السكربت يعمل ويبحث عن تذاكر الأهلي كل 10 ثواني.\n🕒 الوقت الحالي: {now}")
                     print("✅ تم إرسال رسالة تأكيد بأن السكربت شغال.")
                 except Exception as e:
                     print(f"❌ فشل إرسال رسالة الاطمئنان: {e}")
                 last_keep_alive = time.time()
 
-            time.sleep(30)
-
-
-
+            time.sleep(10)
